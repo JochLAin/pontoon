@@ -1,5 +1,8 @@
 import React from 'react';
+import sinon from 'sinon';
 import { shallow } from 'enzyme';
+
+import api from 'core/api';
 
 import UserNotificationsMenuBase, {
     UserNotificationsMenu,
@@ -50,9 +53,22 @@ describe('<UserNotificationsMenu>', () => {
 });
 
 describe('<UserNotificationsMenuBase>', () => {
+    const sandbox = sinon.createSandbox();
+
+    beforeEach(function () {
+        sandbox.spy(api.uxaction, 'log');
+    });
+
+    afterEach(function () {
+        sandbox.restore();
+    });
+
     it('hides the notifications icon when the user is logged out', () => {
         const user = {
             isAuthenticated: false,
+            notifications: {
+                has_unread: false,
+            },
         };
         const wrapper = shallow(<UserNotificationsMenuBase user={user} />);
 
@@ -63,7 +79,6 @@ describe('<UserNotificationsMenuBase>', () => {
         const user = {
             isAuthenticated: true,
             notifications: {
-                has_unread: false,
                 notifications: [],
             },
         };
@@ -72,7 +87,25 @@ describe('<UserNotificationsMenuBase>', () => {
         expect(wrapper.find('.user-notifications-menu')).toHaveLength(1);
     });
 
-    it('highlights the notifications icon when the user has unread notifications', () => {
+    it('shows the notifications badge when the user has unread notifications and call logUxAction', () => {
+        const user = {
+            isAuthenticated: true,
+            notifications: {
+                has_unread: true,
+                notifications: [],
+                unread_count: '5',
+            },
+        };
+        const wrapper = shallow(<UserNotificationsMenuBase user={user} />);
+
+        expect(wrapper.find('.user-notifications-menu .badge').text()).toEqual(
+            '5',
+        );
+        expect(api.uxaction.log.called).toEqual(true);
+    });
+
+    it('calls the logUxAction function on click on the icon if menu not visible', () => {
+        const markAllNotificationsAsRead = sinon.spy();
         const user = {
             isAuthenticated: true,
             notifications: {
@@ -80,8 +113,17 @@ describe('<UserNotificationsMenuBase>', () => {
                 notifications: [],
             },
         };
-        const wrapper = shallow(<UserNotificationsMenuBase user={user} />);
+        const wrapper = shallow(
+            <UserNotificationsMenuBase
+                markAllNotificationsAsRead={markAllNotificationsAsRead}
+                user={user}
+            />,
+        );
 
-        expect(wrapper.find('.user-notifications-menu.unread')).toHaveLength(1);
+        wrapper.setState({
+            visible: false,
+        });
+        wrapper.find('.selector').simulate('click');
+        expect(api.uxaction.log.called).toEqual(true);
     });
 });
